@@ -1,0 +1,11 @@
+{
+  "dev": {
+    "driver": "pg",
+    "user": { "ENV": "POSTGRES_USER" },
+    "password": { "ENV": "POSTGRES_PASSWORD" },
+    "database": { "ENV": "POSTGRES_DB" },
+    "host": { "ENV": "DB_HOST" },
+    "port": { "ENV": "POSTGRES_PORT" },
+    "migrations-dir": "src/db/migrations"
+  }
+}
