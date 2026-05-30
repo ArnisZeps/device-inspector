@@ -1,6 +1,8 @@
 services:
   api:
-    build: .
+    build:
+      context: .
+      target: builder
     ports:
       - "${PORT:-3000}:3000"
     env_file:
@@ -8,7 +10,7 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-    command: npm run dev
+    command: sh -c "npm run migrate && npm run dev"
     depends_on:
       postgres:
         condition: service_healthy
