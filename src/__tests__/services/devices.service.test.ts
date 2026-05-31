@@ -1,4 +1,4 @@
-import { createDevice, getDevices, updateDevice } from '../../services/devices.service';
+import { createDevice, getDevice, getDevices, updateDevice } from '../../services/devices.service';
 import pool from '../../db';
 
 jest.mock('../../db', () => ({
@@ -172,5 +172,35 @@ describe('getDevices service', () => {
     mockQuery.mockRejectedValue(new Error('DB connection failed'));
 
     await expect(getDevices({})).rejects.toThrow('DB connection failed');
+  });
+});
+
+describe('getDevice service', () => {
+  beforeEach(() => mockQuery.mockReset());
+
+  it('executes the correct SELECT query and returns the device', async () => {
+    mockQuery.mockResolvedValue({ rows: [mockDevice] });
+
+    const result = await getDevice({ id: 'abc-123' });
+
+    expect(mockQuery).toHaveBeenCalledWith(
+      'SELECT * FROM devices WHERE id = $1 AND deleted_at IS NULL',
+      ['abc-123'],
+    );
+    expect(result).toEqual(mockDevice);
+  });
+
+  it('returns null when no device matches the id', async () => {
+    mockQuery.mockResolvedValue({ rows: [] });
+
+    const result = await getDevice({ id: 'abc-123' });
+
+    expect(result).toBeNull();
+  });
+
+  it('propagates errors thrown by the pool', async () => {
+    mockQuery.mockRejectedValue(new Error('DB connection failed'));
+
+    await expect(getDevice({ id: 'abc-123' })).rejects.toThrow('DB connection failed');
   });
 });

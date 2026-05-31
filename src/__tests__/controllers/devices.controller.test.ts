@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { createDevice, getDevices, updateDevice } from '../../controllers/devices.controller';
+import { createDevice, getDevice, getDevices, updateDevice } from '../../controllers/devices.controller';
 import * as devicesService from '../../services/devices.service';
 
 jest.mock('../../db', () => ({ __esModule: true, default: { query: jest.fn() } }));
@@ -197,6 +197,48 @@ describe('getDevices controller', () => {
     const req = { query: {} } as unknown as Request;
 
     await getDevices(req, res as Response, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+});
+
+describe('getDevice controller', () => {
+  let res: Partial<Response>;
+  let next: NextFunction;
+
+  beforeEach(() => {
+    res = makeRes();
+    next = jest.fn();
+  });
+
+  it('returns 200 with the device on success', async () => {
+    (devicesService.getDevice as jest.Mock).mockResolvedValue(mockDevice);
+    const req = { params: { id: 'abc-123' } } as unknown as Request;
+
+    await getDevice(req, res as Response, next);
+
+    expect(devicesService.getDevice).toHaveBeenCalledWith({ id: 'abc-123' });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(mockDevice);
+  });
+
+  it('returns 404 when the device does not exist', async () => {
+    (devicesService.getDevice as jest.Mock).mockResolvedValue(null);
+    const req = { params: { id: 'abc-123' } } as unknown as Request;
+
+    await getDevice(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Device not found' });
+  });
+
+  it('calls next with the error when the service throws', async () => {
+    const error = new Error('DB connection failed');
+    (devicesService.getDevice as jest.Mock).mockRejectedValue(error);
+    const req = { params: { id: 'abc-123' } } as unknown as Request;
+
+    await getDevice(req, res as Response, next);
 
     expect(next).toHaveBeenCalledWith(error);
     expect(res.status).not.toHaveBeenCalled();
