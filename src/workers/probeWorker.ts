@@ -3,7 +3,7 @@ import { getDevicesForProbing, saveProbeResult, ProbeDevice, ProbeResult } from 
 
 async function probeDevice(device: ProbeDevice): Promise<ProbeResult> {
   // TODO: implement probe against device.base_url
-  return { success: true };
+  return { reachable: true, status: "ok", durationMs: 120, device_checksum: "checksum_abc123", computed_checksum: null, adapter_used: 'rest' };
 }
 
 async function runProbeRound(): Promise<void> {
@@ -14,7 +14,7 @@ async function runProbeRound(): Promise<void> {
     devices.map(async (device) => {
       const result = await probeDevice(device);
       await saveProbeResult(device.id, result);
-      console.log(`${device.name} (${device.base_url}): ${result.success}`);
+      console.log(`${device.name} (${device.base_url}): ${result.status}`);
     })
   );
 }
