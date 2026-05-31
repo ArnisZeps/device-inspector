@@ -17,6 +17,10 @@ interface GetDevicesInput {
   enabled?: boolean;
 }
 
+interface GetDeviceInput {
+  id: string;
+}
+
 interface Device {
   id: string;
   name: string;
@@ -81,4 +85,15 @@ export async function getDevices(input: GetDevicesInput): Promise<Device[]> {
   );
 
   return result.rows;
+}
+
+export async function getDevice(input: GetDeviceInput) {
+  const { id } = input;
+  
+  const result = await pool.query<Device>(
+    `SELECT * FROM devices WHERE id = $1 AND deleted_at IS NULL`,
+    [id]
+  )
+
+  return result.rows[0] ?? null;
 }
