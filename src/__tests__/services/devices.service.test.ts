@@ -10,25 +10,34 @@ const mockQuery = pool.query as jest.Mock;
 
 const mockDevice = {
   id: 'abc-123',
-  address: '192.168.1.10',
-  protocol: 'http',
-  status: 'pending',
+  name: 'Living Room Camera',
+  base_url: 'http://192.168.1.10',
   enabled: true,
+  capabilities: null,
+  capabilities_at: null,
+  capabilities_fingerprint: null,
+  current_status: 'UNKNOWN',
+  consecutive_failures: 0,
+  consecutive_successes: 0,
+  last_checked_at: null,
+  last_seen_at: null,
+  last_diagnostics: null,
   created_at: new Date('2024-01-01'),
+  deleted_at: null,
 };
 
 describe('updateDevice service', () => {
   beforeEach(() => mockQuery.mockReset());
 
   it('executes the correct UPDATE query and returns the updated device', async () => {
-    const updated = { ...mockDevice, status: 'active' };
+    const updated = { ...mockDevice, enabled: false };
     mockQuery.mockResolvedValue({ rows: [updated] });
 
-    const result = await updateDevice('abc-123', { status: 'active' });
+    const result = await updateDevice('abc-123', { enabled: false });
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE devices'),
-      ['abc-123', 'active'],
+      ['abc-123', false],
     );
     expect(result).toEqual(updated);
   });
@@ -36,7 +45,7 @@ describe('updateDevice service', () => {
   it('returns null when no device matches the id', async () => {
     mockQuery.mockResolvedValue({ rows: [] });
 
-    const result = await updateDevice('missing-id', { status: 'active' });
+    const result = await updateDevice('missing-id', { enabled: false });
 
     expect(result).toBeNull();
   });
@@ -44,7 +53,7 @@ describe('updateDevice service', () => {
   it('propagates errors thrown by the pool', async () => {
     mockQuery.mockRejectedValue(new Error('DB connection failed'));
 
-    await expect(updateDevice('abc-123', { status: 'active' })).rejects.toThrow(
+    await expect(updateDevice('abc-123', { enabled: false })).rejects.toThrow(
       'DB connection failed',
     );
   });
@@ -54,11 +63,11 @@ describe('createDevice service', () => {
   it('executes the correct INSERT query and returns the new device', async () => {
     mockQuery.mockResolvedValue({ rows: [mockDevice] });
 
-    const result = await createDevice({ address: '192.168.1.10', protocol: 'http' });
+    const result = await createDevice({ name: 'Living Room Camera', base_url: 'http://192.168.1.10' });
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO devices'),
-      ['192.168.1.10', 'http'],
+      ['Living Room Camera', 'http://192.168.1.10'],
     );
     expect(result).toEqual(mockDevice);
   });
@@ -67,7 +76,7 @@ describe('createDevice service', () => {
     const error = new Error('DB connection failed');
     mockQuery.mockRejectedValue(error);
 
-    await expect(createDevice({ address: '192.168.1.10', protocol: 'http' })).rejects.toThrow(
+    await expect(createDevice({ name: 'Living Room Camera', base_url: 'http://192.168.1.10' })).rejects.toThrow(
       'DB connection failed',
     );
   });
