@@ -1,28 +1,36 @@
 import pool from '../db';
 
 interface CreateDeviceInput {
-  address: string;
-  protocol: string;
+  name: string;
+  base_url: string;
 }
 
 interface UpdateDeviceInput {
-  address?: string;
-  protocol?: string;
-  status?: string;
+  name?: string;
+  base_url?: string;
   enabled?: boolean;
 }
 
 interface Device {
   id: string;
-  address: string;
-  protocol: string;
-  status: string;
+  name: string;
+  base_url: string;
   enabled: boolean;
+  capabilities: object | null;
+  capabilities_at: Date | null;
+  capabilities_fingerprint: string | null;
+  current_status: string;
+  consecutive_failures: number;
+  consecutive_successes: number;
+  last_checked_at: Date | null;
+  last_seen_at: Date | null;
+  last_diagnostics: object | null;
   created_at: Date;
+  deleted_at: Date | null;
 }
 
 export async function updateDevice(id: string, input: UpdateDeviceInput): Promise<Device | null> {
-  const patchableFields = ['address', 'protocol', 'status', 'enabled'] as const;
+  const patchableFields = ['name', 'base_url', 'enabled'] as const;
   const entries = (Object.keys(input) as (keyof UpdateDeviceInput)[])
     .filter(key => patchableFields.includes(key) && input[key] !== undefined);
 
@@ -30,19 +38,19 @@ export async function updateDevice(id: string, input: UpdateDeviceInput): Promis
   const values = entries.map(key => input[key]);
 
   const result = await pool.query(
-    `UPDATE devices SET ${setClauses} WHERE id = $1 RETURNING *`,
+    `UPDATE devices SET ${setClauses} WHERE id = $1 AND deleted_at IS NULL RETURNING *`,
     [id, ...values]
   );
   return result.rows[0] ?? null;
 }
 
 export async function createDevice(input: CreateDeviceInput): Promise<Device> {
-  const { address, protocol } = input;
+  const { name, base_url } = input;
   const result = await pool.query(
-    `INSERT INTO devices (address, protocol)
+    `INSERT INTO devices (name, base_url)
      VALUES ($1, $2)
      RETURNING *`,
-    [address, protocol]
+    [name, base_url]
   );
   return result.rows[0];
 }

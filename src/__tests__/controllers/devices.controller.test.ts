@@ -7,11 +7,20 @@ jest.mock('../../services/devices.service');
 
 const mockDevice = {
   id: 'abc-123',
-  address: '192.168.1.10',
-  protocol: 'http',
-  status: 'pending',
+  name: 'Living Room Camera',
+  base_url: 'http://192.168.1.10',
   enabled: true,
+  capabilities: null,
+  capabilities_at: null,
+  capabilities_fingerprint: null,
+  current_status: 'UNKNOWN',
+  consecutive_failures: 0,
+  consecutive_successes: 0,
+  last_checked_at: null,
+  last_seen_at: null,
+  last_diagnostics: null,
   created_at: new Date('2024-01-01'),
+  deleted_at: null,
 };
 
 function makeRes(): Partial<Response> {
@@ -41,7 +50,7 @@ describe('updateDevice controller', () => {
 
   it('returns 404 when the device does not exist', async () => {
     (devicesService.updateDevice as jest.Mock).mockResolvedValue(null);
-    const req = { params: { id: 'missing' }, body: { status: 'active' } } as unknown as Request;
+    const req = { params: { id: 'missing' }, body: { enabled: false } } as unknown as Request;
 
     await updateDevice(req, res as Response, next);
 
@@ -50,13 +59,13 @@ describe('updateDevice controller', () => {
   });
 
   it('returns 200 with the updated device on success', async () => {
-    const updated = { ...mockDevice, status: 'active' };
+    const updated = { ...mockDevice, enabled: false };
     (devicesService.updateDevice as jest.Mock).mockResolvedValue(updated);
-    const req = { params: { id: 'abc-123' }, body: { status: 'active' } } as unknown as Request;
+    const req = { params: { id: 'abc-123' }, body: { enabled: false } } as unknown as Request;
 
     await updateDevice(req, res as Response, next);
 
-    expect(devicesService.updateDevice).toHaveBeenCalledWith('abc-123', expect.objectContaining({ status: 'active' }));
+    expect(devicesService.updateDevice).toHaveBeenCalledWith('abc-123', expect.objectContaining({ enabled: false }));
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(updated);
   });
@@ -64,7 +73,7 @@ describe('updateDevice controller', () => {
   it('calls next with the error when the service throws', async () => {
     const error = new Error('DB connection failed');
     (devicesService.updateDevice as jest.Mock).mockRejectedValue(error);
-    const req = { params: { id: 'abc-123' }, body: { status: 'active' } } as unknown as Request;
+    const req = { params: { id: 'abc-123' }, body: { enabled: false } } as unknown as Request;
 
     await updateDevice(req, res as Response, next);
 
@@ -82,27 +91,27 @@ describe('createDevice controller', () => {
     next = jest.fn();
   });
 
-  it('returns 400 when address is missing', async () => {
-    const req = { body: { protocol: 'http' } } as Request;
+  it('returns 400 when name is missing', async () => {
+    const req = { body: { base_url: 'http://192.168.1.10' } } as Request;
 
     await createDevice(req, res as Response, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
       error: 'Missing required fields',
-      missing: ['address'],
+      missing: ['name'],
     });
   });
 
-  it('returns 400 when protocol is missing', async () => {
-    const req = { body: { address: '192.168.1.10' } } as Request;
+  it('returns 400 when base_url is missing', async () => {
+    const req = { body: { name: 'Living Room Camera' } } as Request;
 
     await createDevice(req, res as Response, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
       error: 'Missing required fields',
-      missing: ['protocol'],
+      missing: ['base_url'],
     });
   });
 
@@ -114,19 +123,19 @@ describe('createDevice controller', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
       error: 'Missing required fields',
-      missing: ['address', 'protocol'],
+      missing: ['name', 'base_url'],
     });
   });
 
   it('returns 201 with the created device on success', async () => {
     (devicesService.createDevice as jest.Mock).mockResolvedValue(mockDevice);
-    const req = { body: { address: '192.168.1.10', protocol: 'http' } } as Request;
+    const req = { body: { name: 'Living Room Camera', base_url: 'http://192.168.1.10' } } as Request;
 
     await createDevice(req, res as Response, next);
 
     expect(devicesService.createDevice).toHaveBeenCalledWith({
-      address: '192.168.1.10',
-      protocol: 'http',
+      name: 'Living Room Camera',
+      base_url: 'http://192.168.1.10',
     });
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith(mockDevice);
@@ -135,7 +144,7 @@ describe('createDevice controller', () => {
   it('calls next with the error when the service throws', async () => {
     const error = new Error('DB connection failed');
     (devicesService.createDevice as jest.Mock).mockRejectedValue(error);
-    const req = { body: { address: '192.168.1.10', protocol: 'http' } } as Request;
+    const req = { body: { name: 'Living Room Camera', base_url: 'http://192.168.1.10' } } as Request;
 
     await createDevice(req, res as Response, next);
 
