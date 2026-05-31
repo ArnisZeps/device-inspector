@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { createDevice, updateDevice } from '../../controllers/devices.controller';
+import { createDevice, getDevices, updateDevice } from '../../controllers/devices.controller';
 import * as devicesService from '../../services/devices.service';
 
 jest.mock('../../db', () => ({ __esModule: true, default: { query: jest.fn() } }));
@@ -147,6 +147,56 @@ describe('createDevice controller', () => {
     const req = { body: { name: 'Living Room Camera', base_url: 'http://192.168.1.10' } } as Request;
 
     await createDevice(req, res as Response, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+});
+
+describe('getDevices controller', () => {
+  let res: Partial<Response>;
+  let next: NextFunction;
+
+  beforeEach(() => {
+    res = makeRes();
+    next = jest.fn();
+  });
+
+  it('returns 400 when enabled query param is not "true" or "false"', async () => {
+    const req = { query: { enabled: 'yes' } } as unknown as Request;
+
+    await getDevices(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'enabled must be boolean' });
+  });
+
+  it('returns 200 with all devices when no filters are provided', async () => {
+    (devicesService.getDevices as jest.Mock).mockResolvedValue([mockDevice]);
+    const req = { query: {} } as unknown as Request;
+
+    await getDevices(req, res as Response, next);
+
+    expect(devicesService.getDevices).toHaveBeenCalledWith({ status: undefined, enabled: undefined });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith([mockDevice]);
+  });
+
+  it('passes parsed status and enabled filters to the service', async () => {
+    (devicesService.getDevices as jest.Mock).mockResolvedValue([mockDevice]);
+    const req = { query: { status: 'UP', enabled: 'true' } } as unknown as Request;
+
+    await getDevices(req, res as Response, next);
+
+    expect(devicesService.getDevices).toHaveBeenCalledWith({ status: 'UP', enabled: true });
+  });
+
+  it('calls next with the error when the service throws', async () => {
+    const error = new Error('DB connection failed');
+    (devicesService.getDevices as jest.Mock).mockRejectedValue(error);
+    const req = { query: {} } as unknown as Request;
+
+    await getDevices(req, res as Response, next);
 
     expect(next).toHaveBeenCalledWith(error);
     expect(res.status).not.toHaveBeenCalled();
