@@ -6,7 +6,7 @@ CREATE TABLE devices (
   capabilities             JSONB,
   capabilities_at          TIMESTAMPTZ,
   capabilities_fingerprint TEXT,
-  current_status           TEXT        NOT NULL DEFAULT 'UNKNOWN',
+  status                   TEXT        NOT NULL DEFAULT 'UNKNOWN',
   consecutive_failures     INT         NOT NULL DEFAULT 0,
   consecutive_successes    INT         NOT NULL DEFAULT 0,
   last_checked_at          TIMESTAMPTZ,

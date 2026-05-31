@@ -1,3 +1,4 @@
+import { relative } from 'node:path';
 import pool from '../db';
 
 interface CreateDeviceInput {
@@ -8,6 +9,11 @@ interface CreateDeviceInput {
 interface UpdateDeviceInput {
   name?: string;
   base_url?: string;
+  enabled?: boolean;
+}
+
+interface GetDevicesInput {
+  status?: string;
   enabled?: boolean;
 }
 
@@ -53,4 +59,26 @@ export async function createDevice(input: CreateDeviceInput): Promise<Device> {
     [name, base_url]
   );
   return result.rows[0];
+}
+
+export async function getDevices(input: GetDevicesInput): Promise<Device[]> {
+  const filterableFields = ['status', 'enabled'] as const;
+
+  const entries = (Object.keys(input) as (keyof GetDevicesInput)[])
+    .filter(key => filterableFields.includes(key) && input[key] !== undefined);
+
+  const conditions = ['deleted_at IS NULL'];
+  const values: unknown[] = [];
+
+  entries.forEach((key, i) => {
+    conditions.push(`${key} = $${i + 1}`);
+    values.push(input[key]);
+  });
+
+  const result = await pool.query<Device>(
+    `SELECT * FROM devices WHERE ${conditions.join(' AND ')}`,
+    values
+  );
+
+  return result.rows;
 }
