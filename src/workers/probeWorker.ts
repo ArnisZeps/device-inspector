@@ -3,12 +3,20 @@ import { getDevicesForProbing, updateDeviceProtocols, saveProbeResult, ProbeDevi
 
 const PROTOCOL_TTL_MS = 10 * 60 * 1000;
 
-async function discoverProtocols(device: ProbeDevice): Promise<string[]> {
+interface DiagnosticsResponse {
+  hw_version: string;
+  sw_version: string;
+  fw_version: string;
+  status: string;
+  checksum: string;
+}
+
+export async function discoverProtocols(device: ProbeDevice): Promise<string[]> {
   let healthRes: Response;
   try {
     healthRes = await fetch(`${device.base_url}/health`);
   } catch (err) {
-    console.log(`${device.name} protocol discovery failed: ${err instanceof Error ? err.message : String(err)}`);
+    console.log(`${device.name} health endpoint request error: ${err instanceof Error ? err.message : String(err)}`);
     return device.protocols;
   }
 
@@ -18,7 +26,7 @@ async function discoverProtocols(device: ProbeDevice): Promise<string[]> {
     await updateDeviceProtocols(device.id, protocols);
     return protocols;
   } catch (err) {
-    console.error(`${device.name} protocol discovery response error:`, err);
+    console.error(`${device.name} protocol update error:`, err);
     return device.protocols;
   }
 }
@@ -26,7 +34,7 @@ async function discoverProtocols(device: ProbeDevice): Promise<string[]> {
 const MAX_ATTEMPTS = 3;
 const PROBE_TIMEOUT_MS = 15000;
 
-async function probeDevice(device: ProbeDevice): Promise<ProbeResult> {
+export async function probeDevice(device: ProbeDevice): Promise<ProbeResult> {
   const isStale = !device.protocols_discovered ||
     Date.now() - new Date(device.protocols_discovered).getTime() > PROTOCOL_TTL_MS;
   const protocols = isStale ? await discoverProtocols(device) : device.protocols;
@@ -54,20 +62,60 @@ async function probeDevice(device: ProbeDevice): Promise<ProbeResult> {
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      return { reachable: true, status: 'error', durationMs, attempts: attempt, adapter_used, device_checksum: '', computed_checksum: null, error: `HTTP ${res.status}`, raw_response: body || undefined };
+      return {
+        reachable: true,
+        diagnostics_status: "ERROR",
+        durationMs,
+        attempts: attempt,
+        adapter_used,
+        device_checksum: '',
+        computed_checksum: null,
+        error: `HTTP ${res.status}`,
+        raw_response: body || undefined,
+      };
     }
 
-    let diag: { hw_version: string; sw_version: string; fw_version: string; status: string; checksum: string };
+    let diag: DiagnosticsResponse;
     try {
-      diag = await res.json() as typeof diag;
+      diag = await res.json() as DiagnosticsResponse;
     } catch {
-      return { reachable: true, status: 'error', durationMs, attempts: attempt, adapter_used, device_checksum: '', computed_checksum: null, error: 'Invalid response body' };
+      return {
+        reachable: true,
+        diagnostics_status: "ERROR",
+        durationMs,
+        attempts: attempt,
+        adapter_used,
+        device_checksum: '',
+        computed_checksum: null,
+        error: 'Invalid response body',
+      };
     }
 
-    return { reachable: true, status: diag.status, durationMs, attempts: attempt, adapter_used, hw_version: diag.hw_version, sw_version: diag.sw_version, fw_version: diag.fw_version, device_checksum: diag.checksum, computed_checksum: null, raw_response: diag };
+    return {
+      reachable: true,
+      diagnostics_status: diag.status,
+      durationMs,
+      attempts: attempt,
+      adapter_used,
+      hw_version: diag.hw_version,
+      sw_version: diag.sw_version,
+      fw_version: diag.fw_version,
+      device_checksum: diag.checksum,
+      computed_checksum: null,
+      raw_response: diag,
+    };
   }
 
-  return { reachable: false, status: 'offline', durationMs: Date.now() - start, attempts: MAX_ATTEMPTS, adapter_used, device_checksum: '', computed_checksum: null, error: lastError };
+  return {
+    reachable: false,
+    diagnostics_status: null,
+    durationMs: Date.now() - start,
+    attempts: MAX_ATTEMPTS,
+    adapter_used,
+    device_checksum: '',
+    computed_checksum: null,
+    error: lastError,
+  };
 }
 
 async function runProbeRound(): Promise<void> {
@@ -78,7 +126,7 @@ async function runProbeRound(): Promise<void> {
     devices.map(async (device) => {
       const result = await probeDevice(device);
       await saveProbeResult(device.id, result);
-      console.log(`${device.name} (${device.base_url}): ${result.status}`);
+      console.log(`${device.name} (${device.base_url}): reachable=${result.reachable}, diagnostics=${result.diagnostics_status ?? 'n/a'}`);
     })
   );
 }

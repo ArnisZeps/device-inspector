@@ -4,7 +4,7 @@ CREATE TABLE
         device_id UUID NOT NULL REFERENCES devices (id),
         probed_at TIMESTAMPTZ NOT NULL DEFAULT now (),
         reachable BOOLEAN NOT NULL,
-        status TEXT,
+        diagnostics_status TEXT,
         adapter_used TEXT,
         hw_version TEXT,
         sw_version TEXT,
