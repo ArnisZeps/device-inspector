@@ -4,6 +4,8 @@ export interface ProbeDevice {
   id: string;
   name: string;
   base_url: string;
+  protocols: string[];
+  protocols_discovered: Date | null;
 }
 
 export interface ProbeResult {
@@ -11,6 +13,7 @@ export interface ProbeResult {
   reachable: boolean;
   status: string;
   durationMs: number;
+  attempts: number;
   device_checksum: string;
   computed_checksum: string | null;
   checksum_valid?: boolean;
@@ -23,9 +26,16 @@ export interface ProbeResult {
 
 export async function getDevicesForProbing(): Promise<ProbeDevice[]> {
   const result = await pool.query<ProbeDevice>(
-    `SELECT id, name, base_url FROM devices WHERE enabled = TRUE AND deleted_at IS NULL`
+    `SELECT id, name, base_url, protocols, protocols_discovered FROM devices WHERE enabled = TRUE AND deleted_at IS NULL`
   );
   return result.rows;
+}
+
+export async function updateDeviceProtocols(deviceId: string, protocols: string[]): Promise<void> {
+  await pool.query(
+    `UPDATE devices SET protocols = $2, protocols_discovered = now() WHERE id = $1`,
+    [deviceId, protocols]
+  );
 }
 
 export async function saveProbeResult(deviceId: string, result: ProbeResult): Promise<void> {
@@ -36,8 +46,8 @@ export async function saveProbeResult(deviceId: string, result: ProbeResult): Pr
     await client.query(
       `INSERT INTO device_probes
          (device_id, reachable, status, adapter_used, hw_version, sw_version, fw_version,
-          device_checksum, computed_checksum, checksum_valid, latency_ms, error, raw_response)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          device_checksum, computed_checksum, checksum_valid, latency_ms, attempts, error, raw_response)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         deviceId,
         result.reachable,
@@ -50,6 +60,7 @@ export async function saveProbeResult(deviceId: string, result: ProbeResult): Pr
         result.computed_checksum ?? null,
         result.checksum_valid ?? null,
         result.durationMs,
+        result.attempts,
         result.error ?? null,
         result.raw_response ? JSON.stringify(result.raw_response) : null,
       ]
