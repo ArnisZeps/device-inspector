@@ -31,5 +31,10 @@ services:
       timeout: 5s
       retries: 5
 
+  mock-devices:
+    build: ./mock_service
+    ports:
+      - "9001-9004:9001-9004"
+
 volumes:
   postgres_data:
