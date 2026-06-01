@@ -10,15 +10,12 @@ const mockDevice = {
   name: 'Living Room Camera',
   base_url: 'http://192.168.1.10',
   enabled: true,
-  capabilities: null,
-  capabilities_at: null,
-  capabilities_fingerprint: null,
-  current_status: 'UNKNOWN',
-  consecutive_failures: 0,
-  consecutive_successes: 0,
+  protocols: [],
+  protocols_discovered: null,
+  connectivity_status: 'UNKNOWN',
+  diagnostics_status: null,
   last_checked_at: null,
   last_seen_at: null,
-  last_diagnostics: null,
   created_at: new Date('2024-01-01'),
   deleted_at: null,
 };
@@ -177,18 +174,18 @@ describe('getDevices controller', () => {
 
     await getDevices(req, res as Response, next);
 
-    expect(devicesService.getDevices).toHaveBeenCalledWith({ status: undefined, enabled: undefined });
+    expect(devicesService.getDevices).toHaveBeenCalledWith({ connectivity_status: undefined, enabled: undefined });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith([mockDevice]);
   });
 
-  it('passes parsed status and enabled filters to the service', async () => {
+  it('passes parsed connectivity_status and enabled filters to the service', async () => {
     (devicesService.getDevices as jest.Mock).mockResolvedValue([mockDevice]);
-    const req = { query: { status: 'UP', enabled: 'true' } } as unknown as Request;
+    const req = { query: { connectivity_status: 'ONLINE', enabled: 'true' } } as unknown as Request;
 
     await getDevices(req, res as Response, next);
 
-    expect(devicesService.getDevices).toHaveBeenCalledWith({ status: 'UP', enabled: true });
+    expect(devicesService.getDevices).toHaveBeenCalledWith({ connectivity_status: 'ONLINE', enabled: true });
   });
 
   it('calls next with the error when the service throws', async () => {

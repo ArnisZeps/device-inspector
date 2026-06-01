@@ -1,5 +1,11 @@
-import { relative } from 'node:path';
 import pool from '../db';
+
+export enum ConnectivityStatus {
+  UNKNOWN = 'UNKNOWN',
+  ONLINE = 'ONLINE',
+  DEGRADED = 'DEGRADED',
+  DOWN = 'DOWN',
+}
 
 interface CreateDeviceInput {
   name: string;
@@ -13,7 +19,7 @@ interface UpdateDeviceInput {
 }
 
 interface GetDevicesInput {
-  status?: string;
+  connectivity_status?: string;
   enabled?: boolean;
 }
 
@@ -26,15 +32,12 @@ interface Device {
   name: string;
   base_url: string;
   enabled: boolean;
-  capabilities: object | null;
-  capabilities_at: Date | null;
-  capabilities_fingerprint: string | null;
-  current_status: string;
-  consecutive_failures: number;
-  consecutive_successes: number;
+  protocols: string[];
+  protocols_discovered: Date | null;
+  connectivity_status: ConnectivityStatus;
+  diagnostics_status: string | null;
   last_checked_at: Date | null;
   last_seen_at: Date | null;
-  last_diagnostics: object | null;
   created_at: Date;
   deleted_at: Date | null;
 }
@@ -66,7 +69,7 @@ export async function createDevice(input: CreateDeviceInput): Promise<Device> {
 }
 
 export async function getDevices(input: GetDevicesInput): Promise<Device[]> {
-  const filterableFields = ['status', 'enabled'] as const;
+  const filterableFields = ['connectivity_status', 'enabled'] as const;
 
   const entries = (Object.keys(input) as (keyof GetDevicesInput)[])
     .filter(key => filterableFields.includes(key) && input[key] !== undefined);

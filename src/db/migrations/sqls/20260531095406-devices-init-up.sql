@@ -1,3 +1,5 @@
+CREATE TYPE connectivity_status AS ENUM ('UNKNOWN', 'ONLINE', 'DEGRADED', 'DOWN');
+
 CREATE TABLE
     devices (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
@@ -6,9 +8,8 @@ CREATE TABLE
         enabled BOOLEAN NOT NULL DEFAULT TRUE,
         protocols TEXT[] NOT NULL DEFAULT '{}',
         protocols_discovered TIMESTAMPTZ,
-        status TEXT NOT NULL DEFAULT 'UNKNOWN',
-        consecutive_failures INT NOT NULL DEFAULT 0,
-        consecutive_successes INT NOT NULL DEFAULT 0,
+        connectivity_status connectivity_status NOT NULL DEFAULT 'UNKNOWN',
+        diagnostics_status TEXT,
         last_checked_at TIMESTAMPTZ,
         last_seen_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now (),

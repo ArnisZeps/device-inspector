@@ -1,4 +1,5 @@
 import pool from '../db';
+import { ConnectivityStatus } from './devices.service';
 
 export interface ProbeDevice {
   id: string;
@@ -11,7 +12,7 @@ export interface ProbeDevice {
 export interface ProbeResult {
   adapter_used: string;
   reachable: boolean;
-  status: string;
+  diagnostics_status: string | null;
   durationMs: number;
   attempts: number;
   device_checksum: string;
@@ -45,13 +46,14 @@ export async function saveProbeResult(deviceId: string, result: ProbeResult): Pr
 
     await client.query(
       `INSERT INTO device_probes
-         (device_id, reachable, status, adapter_used, hw_version, sw_version, fw_version,
-          device_checksum, computed_checksum, checksum_valid, latency_ms, attempts, error, raw_response)
+         (device_id, reachable, diagnostics_status, adapter_used,
+          hw_version, sw_version, fw_version, device_checksum, computed_checksum,
+          checksum_valid, latency_ms, attempts, error, raw_response)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         deviceId,
         result.reachable,
-        result.status,
+        result.diagnostics_status,
         result.adapter_used,
         result.hw_version ?? null,
         result.sw_version ?? null,
@@ -66,18 +68,26 @@ export async function saveProbeResult(deviceId: string, result: ProbeResult): Pr
       ]
     );
 
-    const success = result.reachable && result.status === 'ok';
-    const deviceStatus = result.reachable ? result.status : 'offline';
-
     await client.query(
       `UPDATE devices SET
-         status                = $2,
-         last_checked_at       = now(),
-         last_seen_at          = CASE WHEN $3 THEN now() ELSE last_seen_at END,
-         consecutive_failures  = CASE WHEN $4 THEN 0 ELSE consecutive_failures + 1 END,
-         consecutive_successes = CASE WHEN $4 THEN consecutive_successes + 1 ELSE 0 END
+         diagnostics_status  = $2::TEXT,
+         connectivity_status = (
+           SELECT CASE
+             WHEN COUNT(*) FILTER (WHERE NOT reachable) >= 5 THEN '${ConnectivityStatus.DOWN}'
+             WHEN COUNT(*) FILTER (WHERE NOT reachable) >= 1 THEN '${ConnectivityStatus.DEGRADED}'
+             ELSE '${ConnectivityStatus.ONLINE}'
+           END
+           FROM (
+             SELECT reachable FROM device_probes
+             WHERE device_id = $1
+             ORDER BY probed_at DESC
+             LIMIT 5
+           ) recent
+         ),
+         last_checked_at     = now(),
+         last_seen_at        = CASE WHEN $3 THEN now() ELSE last_seen_at END
        WHERE id = $1`,
-      [deviceId, deviceStatus, result.reachable, success]
+      [deviceId, result.diagnostics_status, result.reachable]
     );
 
     await client.query('COMMIT');

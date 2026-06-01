@@ -14,15 +14,12 @@ const mockDevices = [
     name: 'Living Room Camera',
     base_url: 'http://192.168.1.10',
     enabled: true,
-    capabilities: null,
-    capabilities_at: null,
-    capabilities_fingerprint: null,
-    current_status: 'UNKNOWN',
-    consecutive_failures: 0,
-    consecutive_successes: 0,
+    protocols: [],
+    protocols_discovered: null,
+    connectivity_status: 'UNKNOWN',
+    diagnostics_status: null,
     last_checked_at: null,
     last_seen_at: null,
-    last_diagnostics: null,
     created_at: new Date('2024-01-01'),
     deleted_at: null,
   },
@@ -31,15 +28,12 @@ const mockDevices = [
     name: 'Entrance Camera',
     base_url: 'http://192.168.1.10',
     enabled: true,
-    capabilities: null,
-    capabilities_at: null,
-    capabilities_fingerprint: null,
-    current_status: 'UP',
-    consecutive_failures: 0,
-    consecutive_successes: 0,
+    protocols: [],
+    protocols_discovered: null,
+    connectivity_status: 'ONLINE',
+    diagnostics_status: null,
     last_checked_at: null,
     last_seen_at: null,
-    last_diagnostics: null,
     created_at: new Date('2024-01-01'),
     deleted_at: null,
   }
@@ -50,15 +44,14 @@ const mockDevice = {
   name: 'Living Room Camera',
   base_url: 'http://192.168.1.10',
   enabled: true,
-  capabilities: null,
-  capabilities_at: null,
-  capabilities_fingerprint: null,
-  current_status: 'UNKNOWN',
+  protocols: [],
+  protocols_discovered: null,
+  connectivity_status: 'UNKNOWN',
+  diagnostics_status: null,
   consecutive_failures: 0,
   consecutive_successes: 0,
   last_checked_at: null,
   last_seen_at: null,
-  last_diagnostics: null,
   created_at: new Date('2024-01-01'),
   deleted_at: null,
 };
@@ -134,14 +127,14 @@ describe('getDevices service', () => {
     expect(result).toEqual(mockDevices);
   });
 
-  it('filters by status when status is provided', async () => {
+  it('filters by connectivity_status when connectivity_status is provided', async () => {
     mockQuery.mockResolvedValue({ rows: [mockDevices[1]] });
 
-    const result = await getDevices({ status: 'UP' });
+    const result = await getDevices({ connectivity_status: 'ONLINE' });
 
     expect(mockQuery).toHaveBeenCalledWith(
-      'SELECT * FROM devices WHERE deleted_at IS NULL AND status = $1',
-      ['UP'],
+      'SELECT * FROM devices WHERE deleted_at IS NULL AND connectivity_status = $1',
+      ['ONLINE'],
     );
     expect(result).toEqual([mockDevices[1]]);
   });
@@ -157,14 +150,14 @@ describe('getDevices service', () => {
     );
   });
 
-  it('filters by both status and enabled', async () => {
+  it('filters by both connectivity_status and enabled', async () => {
     mockQuery.mockResolvedValue({ rows: [mockDevices[1]] });
 
-    await getDevices({ status: 'UP', enabled: true });
+    await getDevices({ connectivity_status: 'ONLINE', enabled: true });
 
     expect(mockQuery).toHaveBeenCalledWith(
-      'SELECT * FROM devices WHERE deleted_at IS NULL AND status = $1 AND enabled = $2',
-      ['UP', true],
+      'SELECT * FROM devices WHERE deleted_at IS NULL AND connectivity_status = $1 AND enabled = $2',
+      ['ONLINE', true],
     );
   });
 
