@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { createDevice, getDevice, getDevices, updateDevice } from '../../controllers/devices.controller';
+import { createDevice, getDevice, getDeviceHistory, getDevices, updateDevice } from '../../controllers/devices.controller';
 import * as devicesService from '../../services/devices.service';
+import * as probeService from '../../services/probe.service';
 
 jest.mock('../../db', () => ({ __esModule: true, default: { query: jest.fn() } }));
 jest.mock('../../services/devices.service');
+jest.mock('../../services/probe.service');
 
 const mockDevice = {
   id: 'abc-123',
@@ -194,6 +196,118 @@ describe('getDevices controller', () => {
     const req = { query: {} } as unknown as Request;
 
     await getDevices(req, res as Response, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+});
+
+describe('getDeviceHistory controller', () => {
+  let res: Partial<Response>;
+  let next: NextFunction;
+
+  const mockHistory = {
+    data: [],
+    total: 0,
+    limit: 20,
+    offset: 0,
+  };
+
+  beforeEach(() => {
+    res = makeRes();
+    next = jest.fn();
+    (devicesService.getDevice as jest.Mock).mockResolvedValue(mockDevice);
+    (probeService.getDeviceHistory as jest.Mock).mockResolvedValue(mockHistory);
+  });
+
+  it('returns 200 with history on success', async () => {
+    const req = { params: { id: 'abc-123' }, query: {} } as unknown as Request;
+
+    await getDeviceHistory(req, res as Response, next);
+
+    expect(probeService.getDeviceHistory).toHaveBeenCalledWith({ deviceId: 'abc-123', limit: 20, offset: 0, from: undefined, to: undefined });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(mockHistory);
+  });
+
+  it('returns 404 when device does not exist', async () => {
+    (devicesService.getDevice as jest.Mock).mockResolvedValue(null);
+    const req = { params: { id: 'abc-123' }, query: {} } as unknown as Request;
+
+    await getDeviceHistory(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Device not found' });
+  });
+
+  it('returns 400 when limit is out of range', async () => {
+    const req = { params: { id: 'abc-123' }, query: { limit: '200' } } as unknown as Request;
+
+    await getDeviceHistory(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'limit must be an integer between 1 and 100' });
+  });
+
+  it('returns 400 when limit is not a number', async () => {
+    const req = { params: { id: 'abc-123' }, query: { limit: 'abc' } } as unknown as Request;
+
+    await getDeviceHistory(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'limit must be an integer between 1 and 100' });
+  });
+
+  it('returns 400 when offset is negative', async () => {
+    const req = { params: { id: 'abc-123' }, query: { offset: '-1' } } as unknown as Request;
+
+    await getDeviceHistory(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'offset must be a non-negative integer' });
+  });
+
+  it('returns 400 when from is not a valid timestamp', async () => {
+    const req = { params: { id: 'abc-123' }, query: { from: 'not-a-date' } } as unknown as Request;
+
+    await getDeviceHistory(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'from must be a valid timestamp' });
+  });
+
+  it('returns 400 when to is not a valid timestamp', async () => {
+    const req = { params: { id: 'abc-123' }, query: { to: 'not-a-date' } } as unknown as Request;
+
+    await getDeviceHistory(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'to must be a valid timestamp' });
+  });
+
+  it('passes parsed limit, offset, from, and to to the service', async () => {
+    const req = {
+      params: { id: 'abc-123' },
+      query: { limit: '10', offset: '5', from: '2026-05-01T00:00:00Z', to: '2026-05-31T23:59:59Z' },
+    } as unknown as Request;
+
+    await getDeviceHistory(req, res as Response, next);
+
+    expect(probeService.getDeviceHistory).toHaveBeenCalledWith({
+      deviceId: 'abc-123',
+      limit: 10,
+      offset: 5,
+      from: new Date('2026-05-01T00:00:00Z'),
+      to: new Date('2026-05-31T23:59:59Z'),
+    });
+  });
+
+  it('calls next with error when service throws', async () => {
+    const error = new Error('DB connection failed');
+    (probeService.getDeviceHistory as jest.Mock).mockRejectedValue(error);
+    const req = { params: { id: 'abc-123' }, query: {} } as unknown as Request;
+
+    await getDeviceHistory(req, res as Response, next);
 
     expect(next).toHaveBeenCalledWith(error);
     expect(res.status).not.toHaveBeenCalled();

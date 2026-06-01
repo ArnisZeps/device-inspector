@@ -1,6 +1,40 @@
 import pool from '../db';
 import { ConnectivityStatus } from './devices.service';
 
+export interface DeviceProbe {
+  id: string;
+  device_id: string;
+  probed_at: Date;
+  reachable: boolean;
+  diagnostics_status: string | null;
+  adapter_used: string | null;
+  hw_version: string | null;
+  sw_version: string | null;
+  fw_version: string | null;
+  device_checksum: string | null;
+  computed_checksum: string | null;
+  checksum_valid: boolean | null;
+  latency_ms: number | null;
+  attempts: number;
+  error: string | null;
+  raw_response: unknown;
+}
+
+export interface DeviceHistoryResult {
+  data: DeviceProbe[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+interface GetDeviceHistoryInput {
+  deviceId: string;
+  limit: number;
+  offset: number;
+  from?: Date;
+  to?: Date;
+}
+
 export interface ProbeDevice {
   id: string;
   name: string;
@@ -23,6 +57,43 @@ export interface ProbeResult {
   fw_version?: string;
   error?: string;
   raw_response?: unknown;
+}
+
+export async function getDeviceHistory(input: GetDeviceHistoryInput): Promise<DeviceHistoryResult> {
+  const { deviceId, limit, offset, from, to } = input;
+
+  const conditions: string[] = ['device_id = $1'];
+  const values: unknown[] = [deviceId];
+  let paramIdx = 2;
+
+  if (from !== undefined) {
+    conditions.push(`probed_at >= $${paramIdx++}`);
+    values.push(from);
+  }
+  if (to !== undefined) {
+    conditions.push(`probed_at <= $${paramIdx++}`);
+    values.push(to);
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  const [countResult, dataResult] = await Promise.all([
+    pool.query<{ count: string }>(
+      `SELECT COUNT(*) FROM device_probes WHERE ${whereClause}`,
+      values
+    ),
+    pool.query<DeviceProbe>(
+      `SELECT * FROM device_probes WHERE ${whereClause} ORDER BY probed_at DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      [...values, limit, offset]
+    ),
+  ]);
+
+  return {
+    data: dataResult.rows,
+    total: parseInt(countResult.rows[0].count, 10),
+    limit,
+    offset,
+  };
 }
 
 export async function getDevicesForProbing(): Promise<ProbeDevice[]> {
