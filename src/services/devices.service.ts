@@ -5,6 +5,7 @@ export enum ConnectivityStatus {
   ONLINE = 'ONLINE',
   DEGRADED = 'DEGRADED',
   DOWN = 'DOWN',
+  ERROR = 'ERROR',
 }
 
 interface CreateDeviceInput {

@@ -147,7 +147,7 @@ export async function saveProbeResult(deviceId: string, result: ProbeResult): Pr
              WHEN COUNT(*) FILTER (WHERE NOT reachable) >= 5 THEN '${ConnectivityStatus.DOWN}'
              WHEN COUNT(*) FILTER (WHERE NOT reachable) >= 1 THEN '${ConnectivityStatus.DEGRADED}'
              ELSE '${ConnectivityStatus.ONLINE}'
-           END
+           END::connectivity_status
            FROM (
              SELECT reachable FROM device_probes
              WHERE device_id = $1
