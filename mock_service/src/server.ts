@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import { profiles, DeviceProfile } from './profiles';
+import { startGrpcServer } from './grpcServer';
 
 function diagnosticsBody(profile: DeviceProfile) {
   return {
@@ -20,6 +21,7 @@ function createApp(profile: DeviceProfile): express.Express {
       name: profile.name,
       protocols: profile.protocols,
       endpoints: { diagnostics: '/diagnostics' },
+      ...(profile.grpcPort !== undefined && { grpc_port: profile.grpcPort }),
     });
   });
 
@@ -68,6 +70,10 @@ function createApp(profile: DeviceProfile): express.Express {
 for (const profile of profiles) {
   const app = createApp(profile);
   app.listen(profile.port, () => {
-    console.log(`[${profile.name}] started on port ${profile.port} (${profile.behavior})`);
+    console.log(`[${profile.name}] REST started on port ${profile.port} (${profile.behavior})`);
   });
+
+  if (profile.grpcPort !== undefined) {
+    startGrpcServer(profile);
+  }
 }

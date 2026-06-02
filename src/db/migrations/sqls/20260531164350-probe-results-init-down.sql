@@ -1,1 +1,1 @@
-DROP TABLE probe_results;
+DROP TABLE device_probes;
