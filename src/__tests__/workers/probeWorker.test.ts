@@ -1,6 +1,7 @@
-import { probeDevice, discoverProtocols } from '../../workers/probeWorker';
+import { probeDevice, checkHealth } from '../../workers/probeWorker';
 import { ProbeDevice } from '../../services/probe.service';
 import * as probeService from '../../services/probe.service';
+import { ConnectivityStatus } from '../../services/devices.service';
 
 jest.mock('../../services/probe.service');
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
@@ -8,7 +9,7 @@ jest.mock('../../db', () => ({ __esModule: true, default: { query: jest.fn() } }
 
 const mockUpdateDeviceProtocols = probeService.updateDeviceProtocols as jest.Mock;
 
-const freshDevice: ProbeDevice = {
+const device: ProbeDevice = {
   id: 'device-1',
   name: 'Test Device',
   base_url: 'http://192.168.1.10',
@@ -33,18 +34,90 @@ const diagResponse = {
   checksum: 'abc123',
 };
 
-describe('probeDevice', () => {
+describe('checkHealth', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
   });
 
-  it('returns unreachable after all 3 attempts fail with network errors', async () => {
+  it('returns unreachable after all 3 retries fail with network errors', async () => {
     (global.fetch as jest.Mock)
       .mockRejectedValueOnce(new Error('Connection refused'))
       .mockRejectedValueOnce(new Error('Connection refused'))
       .mockRejectedValueOnce(new Error('Connection refused'));
 
-    const result = await probeDevice(freshDevice);
+    const result = await checkHealth(device);
+
+    expect(result.outcome).toBe(ConnectivityStatus.DOWN);
+    if (result.outcome === ConnectivityStatus.DOWN) {
+      expect(result.error).toBe('Connection refused');
+      expect(result.attempts).toBe(3);
+    }
+    expect(mockUpdateDeviceProtocols).not.toHaveBeenCalled();
+  });
+
+  it('returns error when health response status is not ok', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(mockResponse(503, 'Service Unavailable'));
+
+    const result = await checkHealth(device);
+
+    expect(result.outcome).toBe(ConnectivityStatus.ERROR);
+    if (result.outcome === ConnectivityStatus.ERROR) {
+      expect(result.error).toBe('HTTP 503');
+      expect(result.attempts).toBe(1);
+    }
+  });
+
+  it('returns error when health response body is invalid JSON', async () => {
+    const response = mockResponse(200, null);
+    response.json = jest.fn().mockRejectedValue(new SyntaxError('Parse error'));
+    (global.fetch as jest.Mock).mockResolvedValue(response);
+
+    const result = await checkHealth(device);
+
+    expect(result.outcome).toBe(ConnectivityStatus.ERROR);
+    if (result.outcome === ConnectivityStatus.ERROR) {
+      expect(result.error).toBe('Invalid health response body');
+      expect(result.attempts).toBe(1);
+    }
+  });
+
+  it('returns ok with protocols and updates device on success', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(mockResponse(200, { protocols: ['grpc', 'rest'] }));
+
+    const result = await checkHealth(device);
+
+    expect(result.outcome).toBe(ConnectivityStatus.ONLINE);
+    if (result.outcome === ConnectivityStatus.ONLINE) {
+      expect(result.protocols).toEqual(['grpc', 'rest']);
+    }
+    expect(mockUpdateDeviceProtocols).toHaveBeenCalledWith('device-1', ['grpc', 'rest']);
+  });
+
+  it('returns ok with empty protocols when health response has no protocols field', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(mockResponse(200, {}));
+
+    const result = await checkHealth(device);
+
+    expect(result.outcome).toBe(ConnectivityStatus.ONLINE);
+    if (result.outcome === ConnectivityStatus.ONLINE) {
+      expect(result.protocols).toEqual([]);
+    }
+    expect(mockUpdateDeviceProtocols).toHaveBeenCalledWith('device-1', []);
+  });
+});
+
+describe('probeDevice', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  it('returns unreachable when health check fails 3 times with network errors', async () => {
+    (global.fetch as jest.Mock)
+      .mockRejectedValueOnce(new Error('Connection refused'))
+      .mockRejectedValueOnce(new Error('Connection refused'))
+      .mockRejectedValueOnce(new Error('Connection refused'));
+
+    const result = await probeDevice(device);
 
     expect(result.reachable).toBe(false);
     expect(result.diagnostics_status).toBeNull();
@@ -54,47 +127,35 @@ describe('probeDevice', () => {
     expect(typeof result.durationMs).toBe('number');
   });
 
-  it('retries on network failure and succeeds on second attempt', async () => {
-    (global.fetch as jest.Mock)
-      .mockRejectedValueOnce(new Error('Timeout'))
-      .mockResolvedValueOnce(mockResponse(200, diagResponse));
-
-    const result = await probeDevice(freshDevice);
-
-    expect(result.reachable).toBe(true);
-    expect(result.attempts).toBe(2);
-    expect(result.diagnostics_status).toBe('OPERATIONAL');
-  });
-
-  it('returns HTTP error result when response status is not ok', async () => {
+  it('returns ERROR when health endpoint returns HTTP error', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(503, 'Service Unavailable'));
 
-    const result = await probeDevice(freshDevice);
+    const result = await probeDevice(device);
 
     expect(result.reachable).toBe(true);
     expect(result.diagnostics_status).toBe('ERROR');
     expect(result.error).toBe('HTTP 503');
     expect(result.attempts).toBe(1);
-    expect(result.device_checksum).toBe('');
-    expect(result.computed_checksum).toBeNull();
   });
 
-  it('returns parse error result when response body is invalid JSON', async () => {
+  it('returns ERROR when health endpoint returns invalid JSON', async () => {
     const response = mockResponse(200, null);
-    response.json = jest.fn().mockRejectedValue(new SyntaxError('Unexpected token'));
+    response.json = jest.fn().mockRejectedValue(new SyntaxError('Parse error'));
     (global.fetch as jest.Mock).mockResolvedValue(response);
 
-    const result = await probeDevice(freshDevice);
+    const result = await probeDevice(device);
 
     expect(result.reachable).toBe(true);
     expect(result.diagnostics_status).toBe('ERROR');
-    expect(result.error).toBe('Invalid response body');
+    expect(result.error).toBe('Invalid health response body');
   });
 
   it('returns full diagnostics data on successful probe', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(mockResponse(200, diagResponse));
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(mockResponse(200, { protocols: ['rest'] }))
+      .mockResolvedValueOnce(mockResponse(200, diagResponse));
 
-    const result = await probeDevice(freshDevice);
+    const result = await probeDevice(device);
 
     expect(result.reachable).toBe(true);
     expect(result.diagnostics_status).toBe('OPERATIONAL');
@@ -106,74 +167,55 @@ describe('probeDevice', () => {
     expect(result.raw_response).toEqual(diagResponse);
   });
 
-  it('uses grpc adapter when protocols list includes grpc', async () => {
-    const grpcDevice: ProbeDevice = { ...freshDevice, protocols: ['grpc', 'rest'] };
-    (global.fetch as jest.Mock).mockResolvedValue(mockResponse(200, diagResponse));
-
-    const result = await probeDevice(grpcDevice);
-
-    expect(result.adapter_used).toBe('grpc');
-  });
-
-  it('discovers protocols and uses them when protocols_discovered is null', async () => {
-    const staleDevice: ProbeDevice = { ...freshDevice, protocols: [], protocols_discovered: null };
+  it('uses grpc adapter when health reports grpc protocol', async () => {
     (global.fetch as jest.Mock)
-      .mockResolvedValueOnce(mockResponse(200, { protocols: ['grpc'] }))
+      .mockResolvedValueOnce(mockResponse(200, { protocols: ['grpc', 'rest'] }))
       .mockResolvedValueOnce(mockResponse(200, diagResponse));
 
-    const result = await probeDevice(staleDevice);
+    const result = await probeDevice(device);
 
     expect(result.adapter_used).toBe('grpc');
   });
-});
 
-describe('discoverProtocols', () => {
-  const device: ProbeDevice = {
-    id: 'device-1',
-    name: 'Test Device',
-    base_url: 'http://192.168.1.10',
-    protocols: ['rest'],
-    protocols_discovered: null,
-  };
+  it('retries diagnostics on network failure and succeeds on second attempt', async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(mockResponse(200, { protocols: ['rest'] }))
+      .mockRejectedValueOnce(new Error('Timeout'))
+      .mockResolvedValueOnce(mockResponse(200, diagResponse));
 
-  beforeEach(() => {
-    global.fetch = jest.fn();
+    const result = await probeDevice(device);
+
+    expect(result.reachable).toBe(true);
+    expect(result.attempts).toBe(2);
+    expect(result.diagnostics_status).toBe('OPERATIONAL');
   });
 
-  it('returns existing protocols when fetch throws', async () => {
-    (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+  it('returns ERROR when diagnostics response status is not ok', async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(mockResponse(200, { protocols: ['rest'] }))
+      .mockResolvedValueOnce(mockResponse(503, 'Service Unavailable'));
 
-    const result = await discoverProtocols(device);
+    const result = await probeDevice(device);
 
-    expect(result).toEqual(['rest']);
-    expect(mockUpdateDeviceProtocols).not.toHaveBeenCalled();
+    expect(result.reachable).toBe(true);
+    expect(result.diagnostics_status).toBe('ERROR');
+    expect(result.error).toBe('HTTP 503');
+    expect(result.attempts).toBe(1);
+    expect(result.device_checksum).toBe('');
+    expect(result.computed_checksum).toBeNull();
   });
 
-  it('returns existing protocols when response JSON is invalid', async () => {
-    const response = mockResponse(200, null);
-    response.json = jest.fn().mockRejectedValue(new SyntaxError('Parse error'));
-    (global.fetch as jest.Mock).mockResolvedValue(response);
+  it('returns ERROR when diagnostics response body is invalid JSON', async () => {
+    const diagBadResponse = mockResponse(200, null);
+    diagBadResponse.json = jest.fn().mockRejectedValue(new SyntaxError('Unexpected token'));
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(mockResponse(200, { protocols: ['rest'] }))
+      .mockResolvedValueOnce(diagBadResponse);
 
-    const result = await discoverProtocols(device);
+    const result = await probeDevice(device);
 
-    expect(result).toEqual(['rest']);
-  });
-
-  it('returns discovered protocols and updates the device on success', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(mockResponse(200, { protocols: ['grpc', 'rest'] }));
-
-    const result = await discoverProtocols(device);
-
-    expect(result).toEqual(['grpc', 'rest']);
-    expect(mockUpdateDeviceProtocols).toHaveBeenCalledWith('device-1', ['grpc', 'rest']);
-  });
-
-  it('returns empty array when health response has no protocols field', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(mockResponse(200, {}));
-
-    const result = await discoverProtocols(device);
-
-    expect(result).toEqual([]);
-    expect(mockUpdateDeviceProtocols).toHaveBeenCalledWith('device-1', []);
+    expect(result.reachable).toBe(true);
+    expect(result.diagnostics_status).toBe('ERROR');
+    expect(result.error).toBe('Invalid response body');
   });
 });
