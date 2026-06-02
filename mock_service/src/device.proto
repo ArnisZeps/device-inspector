@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package device;
+
+service DeviceDiagnostics {
+  rpc GetDiagnostics (DeviceRequest) returns (DiagnosticsResponse);
+}
+
+message DeviceRequest {
+  string device_id = 1;
+}
+
+message DiagnosticsResponse {
+  string hw_version  = 1;
+  string sw_version  = 2;
+  string fw_version  = 3;
+  string status      = 4;  // "ok" | "error"
+  string checksum    = 5;
+}

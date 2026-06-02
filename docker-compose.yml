@@ -35,6 +35,7 @@ services:
     build: ./mock_service
     ports:
       - "9001-9004:9001-9004"
+      - "9102:9102"
 
 volumes:
   postgres_data:

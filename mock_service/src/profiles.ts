@@ -2,6 +2,7 @@ export type Behavior = 'healthy' | 'flaky' | 'down';
 export type Protocol = 'rest' | 'grpc';
 export interface DeviceProfile {
   port: number;
+  grpcPort?: number;
   name: string;
   protocols: Protocol[];
   behavior: Behavior;
@@ -26,6 +27,7 @@ export const profiles: DeviceProfile[] = [
   },
   {
     port: 9002,
+    grpcPort: 9102,
     name: 'USW-Enterprise-48',
     protocols: ['rest', 'grpc'],
     behavior: 'healthy',
