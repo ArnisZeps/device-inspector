@@ -76,6 +76,21 @@ export async function getDevice(req: Request, res: Response, next: NextFunction)
   }
 }
 
+export async function deleteDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const id = req.params.id as string;
+
+  try {
+    const device = await devicesService.deleteDevice(id);
+    if (!device) {
+      res.status(404).json({ error: 'Device not found' });
+      return;
+    }
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getDeviceHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
   const id = req.params.id as string;
 

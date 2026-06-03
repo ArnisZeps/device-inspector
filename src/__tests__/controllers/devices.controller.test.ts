@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { createDevice, getDevice, getDeviceHistory, getDevices, updateDevice } from '../../controllers/devices.controller';
+import { createDevice, deleteDevice, getDevice, getDeviceHistory, getDevices, updateDevice } from '../../controllers/devices.controller';
 import * as devicesService from '../../services/devices.service';
 import * as probeService from '../../services/probe.service';
 
@@ -308,6 +308,47 @@ describe('getDeviceHistory controller', () => {
     const req = { params: { id: 'abc-123' }, query: {} } as unknown as Request;
 
     await getDeviceHistory(req, res as Response, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+});
+
+describe('deleteDevice controller', () => {
+  let res: Partial<Response>;
+  let next: NextFunction;
+
+  beforeEach(() => {
+    res = makeRes();
+    next = jest.fn();
+  });
+
+  it('returns 204 with no body on success', async () => {
+    (devicesService.deleteDevice as jest.Mock).mockResolvedValue(mockDevice);
+    const req = { params: { id: 'abc-123' } } as unknown as Request;
+
+    await deleteDevice(req, res as Response, next);
+
+    expect(devicesService.deleteDevice).toHaveBeenCalledWith('abc-123');
+    expect(res.status).toHaveBeenCalledWith(204);
+  });
+
+  it('returns 404 when the device does not exist', async () => {
+    (devicesService.deleteDevice as jest.Mock).mockResolvedValue(null);
+    const req = { params: { id: 'abc-123' } } as unknown as Request;
+
+    await deleteDevice(req, res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Device not found' });
+  });
+
+  it('calls next with the error when the service throws', async () => {
+    const error = new Error('DB connection failed');
+    (devicesService.deleteDevice as jest.Mock).mockRejectedValue(error);
+    const req = { params: { id: 'abc-123' } } as unknown as Request;
+
+    await deleteDevice(req, res as Response, next);
 
     expect(next).toHaveBeenCalledWith(error);
     expect(res.status).not.toHaveBeenCalled();
