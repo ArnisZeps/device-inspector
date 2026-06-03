@@ -27,15 +27,20 @@ interface HealthOk {
 type HealthCheckResult = HealthUnreachable | HealthError | HealthOk;
 
 const MAX_HEALTH_RETRIES = 3;
+const HEALTH_TIMEOUT_MS = 5000;
 
 export async function checkHealth(device: ProbeDevice): Promise<HealthCheckResult> {
   let lastError = '';
 
   for (let attempt = 1; attempt <= MAX_HEALTH_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
     let res: Response;
     try {
-      res = await fetch(`${device.base_url}/health`);
+      res = await fetch(`${device.base_url}/health`, { signal: controller.signal });
+      clearTimeout(timeout);
     } catch (err) {
+      clearTimeout(timeout);
       lastError = err instanceof Error ? err.message : String(err);
       console.log(`${device.name} health attempt ${attempt}/${MAX_HEALTH_RETRIES} failed: ${lastError}`);
       continue;
