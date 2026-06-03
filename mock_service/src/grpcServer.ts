@@ -3,7 +3,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import path from 'path';
 import { DeviceProfile } from './profiles';
 
-const PROTO_PATH = path.join(__dirname, 'device.proto');
+const PROTO_PATH = path.resolve(__dirname, '../../proto/device.proto');
 
 const packageDef = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,

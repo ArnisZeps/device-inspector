@@ -1,14 +1,9 @@
 import cron from 'node-cron';
 import { getDevicesForProbing, updateDeviceProtocols, saveProbeResult, ProbeDevice, ProbeResult } from '../services/probe.service';
 import { ConnectivityStatus } from '../services/devices.service';
+import { probeGrpc } from './grpcClient';
+import { probeRest } from './restClient';
 
-interface DiagnosticsResponse {
-  hw_version: string;
-  sw_version: string;
-  fw_version: string;
-  status: string;
-  checksum: string;
-}
 
 interface HealthUnreachable {
   outcome: ConnectivityStatus.DOWN;
@@ -25,13 +20,12 @@ interface HealthError {
 interface HealthOk {
   outcome: ConnectivityStatus.ONLINE;
   protocols: string[];
+  grpcPort?: number;
 }
 
 type HealthCheckResult = HealthUnreachable | HealthError | HealthOk;
 
 const MAX_HEALTH_RETRIES = 3;
-const MAX_PROBE_ATTEMPTS = 3;
-const PROBE_TIMEOUT_MS = 15000;
 
 export async function checkHealth(device: ProbeDevice): Promise<HealthCheckResult> {
   let lastError = '';
@@ -51,10 +45,10 @@ export async function checkHealth(device: ProbeDevice): Promise<HealthCheckResul
     }
 
     try {
-      const health = await res.json() as { protocols: string[] };
+      const health = await res.json() as { protocols: string[]; grpc_port?: number };
       const protocols = health.protocols ?? [];
       await updateDeviceProtocols(device.id, protocols);
-      return { outcome: ConnectivityStatus.ONLINE, protocols };
+      return { outcome: ConnectivityStatus.ONLINE, protocols, grpcPort: health.grpc_port };
     } catch (err) {
       return { outcome: ConnectivityStatus.ERROR, error: 'Invalid health response body', attempts: attempt };
     }
@@ -95,71 +89,12 @@ export async function probeDevice(device: ProbeDevice): Promise<ProbeResult> {
   const adapter_used = health.protocols.includes('grpc') ? 'grpc' : 'rest';
 
   if (adapter_used === 'grpc') {
-    // TODO: gRPC diagnostics probe
+    const host = new URL(device.base_url).hostname;
+    const grpcAddress = `${host}:${health.grpcPort}`;
+    return probeGrpc(device.name, grpcAddress, device.id);
   }
 
-  let lastError = '';
-  const start = Date.now();
-
-  for (let attempt = 1; attempt <= MAX_PROBE_ATTEMPTS; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-
-    let res: Response;
-    try {
-      res = await fetch(`${device.base_url}/diagnostics`, { signal: controller.signal });
-      clearTimeout(timeout);
-    } catch (err) {
-      clearTimeout(timeout);
-      lastError = err instanceof Error ? err.message : String(err);
-      console.log(`${device.name} probe attempt ${attempt}/${MAX_PROBE_ATTEMPTS} failed: ${lastError}`);
-      continue;
-    }
-
-    const basePayload = { reachable: true, durationMs: Date.now() - start, attempts: attempt, adapter_used, computed_checksum: null };
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      return { 
-        ...basePayload,
-        diagnostics_status: 'ERROR', 
-        device_checksum: '', 
-        error: `HTTP ${res.status}`, 
-        raw_response: body || undefined };
-      }
-
-    let diag: DiagnosticsResponse;
-    try {
-      diag = await res.json() as DiagnosticsResponse;
-    } catch {
-      return { 
-        ...basePayload, 
-        diagnostics_status: 'ERROR', 
-        device_checksum: '', 
-        error: 'Invalid response body' };
-    }
-
-    return { 
-      ...basePayload, 
-      diagnostics_status: 
-      diag.status, device_checksum: diag.checksum, 
-      hw_version: diag.hw_version, 
-      sw_version: diag.sw_version, 
-      fw_version: diag.fw_version, 
-      raw_response: diag 
-    };
-  }
-
-  return {
-    reachable: false,
-    diagnostics_status: null,
-    durationMs: Date.now() - start,
-    attempts: MAX_PROBE_ATTEMPTS,
-    adapter_used,
-    device_checksum: '',
-    computed_checksum: null,
-    error: lastError,
-  };
+  return probeRest(device.name, device.base_url);
 }
 
 async function runProbeRound(): Promise<void> {
