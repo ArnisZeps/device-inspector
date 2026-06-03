@@ -93,11 +93,19 @@ export async function getDevices(input: GetDevicesInput): Promise<Device[]> {
 
 export async function getDevice(input: GetDeviceInput) {
   const { id } = input;
-  
+
   const result = await pool.query<Device>(
     `SELECT * FROM devices WHERE id = $1 AND deleted_at IS NULL`,
     [id]
   )
 
+  return result.rows[0] ?? null;
+}
+
+export async function deleteDevice(id: string): Promise<Device | null> {
+  const result = await pool.query<Device>(
+    `UPDATE devices SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING *`,
+    [id]
+  );
   return result.rows[0] ?? null;
 }
