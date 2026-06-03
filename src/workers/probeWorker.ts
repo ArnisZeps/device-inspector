@@ -3,6 +3,7 @@ import { getDevicesForProbing, updateDeviceProtocols, saveProbeResult, ProbeDevi
 import { ConnectivityStatus } from '../services/devices.service';
 import { probeGrpc } from './grpcClient';
 import { probeRest } from './restClient';
+import { computeChecksum } from '../services/checksum.service';
 
 
 interface HealthUnreachable {
@@ -104,6 +105,11 @@ async function runProbeRound(): Promise<void> {
   await Promise.allSettled(
     devices.map(async (device) => {
       const result = await probeDevice(device);
+      if (result.reachable && result.raw_response) {
+        const computed = await computeChecksum(JSON.stringify(result.raw_response));
+        result.computed_checksum = computed;
+        if (computed !== null) result.checksum_valid = computed === result.device_checksum;
+      }
       await saveProbeResult(device.id, result);
       console.log(`${device.name} (${device.base_url}): reachable=${result.reachable}, diagnostics=${result.diagnostics_status ?? 'n/a'}`);
     })
