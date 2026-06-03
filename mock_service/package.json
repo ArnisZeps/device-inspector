@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc && cp src/device.proto dist/device.proto",
+    "build": "tsc",
     "start": "node dist/server.js"
   },
   "dependencies": {

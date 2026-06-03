@@ -1,21 +1,23 @@
 FROM node:20-alpine AS builder
 
-WORKDIR /app
+WORKDIR /project/mock_service
 
-COPY package*.json ./
+COPY mock_service/package*.json ./
 RUN npm install
 
-COPY tsconfig.json ./
-COPY src ./src
+COPY mock_service/tsconfig.json ./
+COPY mock_service/src ./src
 RUN npm run build
 
 FROM node:20-alpine
 
-WORKDIR /app
+WORKDIR /project
 
-COPY package*.json ./
+COPY proto ./proto
+COPY --from=builder /project/mock_service/dist ./mock_service/dist
+
+WORKDIR /project/mock_service
+COPY mock_service/package*.json ./
 RUN npm install --omit=dev
-
-COPY --from=builder /app/dist ./dist
 
 CMD ["node", "dist/server.js"]
