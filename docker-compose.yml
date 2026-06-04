@@ -10,7 +10,7 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-    command: sh -c "npm run migrate && npm run dev"
+    command: sh -c "npm run migrate && npm run seed && npm run dev"
     depends_on:
       postgres:
         condition: service_healthy
