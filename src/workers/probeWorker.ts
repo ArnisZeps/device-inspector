@@ -122,8 +122,9 @@ async function runProbeRound(): Promise<void> {
 }
 
 export function start(): void {
-  console.log('Probe worker started, running every minute');
-  cron.schedule('* * * * *', () => {
+  const schedule = process.env.PROBE_CRON_SCHEDULE ?? '* * * * *';
+  console.log(`Probe worker started with schedule: ${schedule}`);
+  cron.schedule(schedule, () => {
     runProbeRound().catch((err) => console.error('Probe round failed:', err));
   });
 }
