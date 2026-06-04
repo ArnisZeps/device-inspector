@@ -41,6 +41,12 @@ The API is available at `http://localhost:3000`. Migrations run automatically on
 | `GET` | `/api/devices/:id/history` | Probe history (`?limit=`, `?offset=`, `?from=`, `?to=`) |
 | `GET` | `/health` | Health check |
 
+## Postman collection
+
+A Postman collection covering all API endpoints is included at [`device-inspector.postman_collection.json`](device-inspector.postman_collection.json.json).
+
+Import it via **File -> Import** in Postman.
+
 ## Development
 
 ```bash

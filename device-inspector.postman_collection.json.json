@@ -1,0 +1,155 @@
+{
+  "info": {
+    "_postman_id": "5a453c77-9dd8-44af-b1f6-808e18470683",
+    "name": "device-inspector",
+    "description": "### Welcome to Postman! This is your first collection. \n\nCollections are your starting point for building and testing APIs. You can use this one to:\n\n• Group related requests\n• Test your API in real-world scenarios\n• Document and share your requests\n\nUpdate the name and overview whenever you’re ready to make it yours.\n\n[Learn more about Postman Collections.](https://learning.postman.com/docs/collections/collections-overview/)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "55370894",
+    "_collection_link": "https://go.postman.co/collection/55370894-5a453c77-9dd8-44af-b1f6-808e18470683?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "patch-device",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "PATCH",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"name\": \"Test Room Camera\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/devices/{{id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "devices",
+            "{{id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "create-device",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"name\": \"AC-Pro\",\r\n    \"base_url\": \"http://mock-devices:9004\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/devices",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "devices"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get-devices",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"name\": \"Main Camera\",\r\n    \"base_url\": \"80.5.12.640\"\r\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/devices",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "devices"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get-device",
+      "request": {
+        "method": "GET",
+        "header": []
+      },
+      "response": []
+    },
+    {
+      "name": "get-device-history",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/devices/{{id}}/history?from=2026-06-01T18:00:00.031Z&to=2026-06-01T19:19:30.053Z&limit=1&offset=4",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "devices",
+            "{{id}}",
+            "history"
+          ],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-06-01T18:00:00.031Z"
+            },
+            {
+              "key": "to",
+              "value": "2026-06-01T19:19:30.053Z"
+            },
+            {
+              "key": "limit",
+              "value": "1"
+            },
+            {
+              "key": "offset",
+              "value": "4"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "delete-device",
+      "request": {
+        "method": "GET",
+        "header": []
+      },
+      "response": []
+    }
+  ]
+}
